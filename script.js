@@ -1,5 +1,17 @@
 const appContainer = document.getElementById('app');
+const RENDER_URL = "https://peonybackend.onrender.com";
+appContainer.innerHTML = `
+    <div class="view">
+        <div id="main-progress" class="progress-container" style="display: none;">
+            <div id="p-bar" class="progress-fill"></div>
+        </div>
+        <div id="dynamic-content"></div>
+    </div>
+`;
 
+const contentArea = document.getElementById('dynamic-content');
+const progressBar = document.getElementById('main-progress');
+const pFill = document.getElementById('p-bar');
 const resultOptions = {
     'glow': { title: "CLEAN GIRL", service: "HYDRATING FACIAL & LED", shop: "SKINCARE BOUTIQUE", tip: "WEAR YOUR FAVORITE GLOSS!", img: "images/glow/glow.jpg" },
     'retro': { title: "TIMELESS VIBES", service: "CLASSIC BLOWOUT", shop: "THRIFTING OR VINTAGE STORE", tip: "BRING A DIGITAL CAMERA!", img: "images/retro/retro.jpeg" },
@@ -27,55 +39,82 @@ const questions = [
     { text: "DREAM ESCAPE?", options: [{ text: "PARIS", cat: "power" }, { text: "TOKYO", cat: "edge" }, { text: "BALI", cat: "zen" }, { text: "LONDON", cat: "retro" }] }
 ];
 
+async function findNearby(type) {
+    const status = document.getElementById('search-status');
+    status.innerHTML = "FINDING LOCATIONS...";
+
+    // Determine which result the user got
+    const winner = Object.keys(state.scores).reduce((a, b) => state.scores[a] > state.scores[b] ? a : b);
+    const data = resultOptions[winner];
+    const searchQuery = type === 'service' ? data.service : data.shop;
+
+    // 1. Ask for user's GPS coordinates
+    navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        // 2. Call your PRIVATE Render backend (NOT Google directly)
+        const url = `${RENDER_URL}/find-place?query=${encodeURIComponent(searchQuery)}&lat=${latitude}&lng=${longitude}`;
+        
+        try {
+            const response = await fetch(url);
+            const resultData = await response.json();
+            
+            if (resultData.places && resultData.places.length > 0) {
+                const place = resultData.places[0];
+                status.innerHTML = `SUGGESTED: <strong>${place.displayName.text.toUpperCase()}</strong><br>${place.formattedAddress.toUpperCase()}`;
+            } else {
+                status.innerText = "NO PLACES FOUND NEARBY.";
+            }
+        } catch (err) {
+            status.innerText = "SERVER IS WAKING UP... PLEASE TRY AGAIN IN 30s.";
+        }
+    }, () => {
+        status.innerText = "LOCATION ACCESS DENIED. PLEASE ENABLE PERMISSIONS.";
+    });
+}
+
 function render() {
     if (state.step === 0) {
-        appContainer.innerHTML = `
-            <div class="view">
-                <h1 class="logo-text">PEONY</h1>
-                <p style="letter-spacing: 3px; font-weight: 700;">WELLNESS CURATOR</p>
-                <button class="btn-main" onclick="nextStep()">START YOUR DAY</button>
-            </div>`;
+        progressBar.style.display = 'none';
+        contentArea.innerHTML = `
+            <h1 class="logo-text">PEONY</h1>
+            <p style="letter-spacing: 3px; font-weight: 700;">WELLNESS CURATOR</p>
+            <button class="btn-main" onclick="nextStep()">START YOUR DAY</button>
+        `;
     } else if (state.step <= questions.length) {
+        progressBar.style.display = 'block';
         const q = questions[state.step - 1];
         
-        // Calculate the percentage
-        // Starts at 0% for Q1, ends at 90% for Q10
+        // Update progress bar width smoothly
         const progressPercent = ((state.step - 1) / questions.length) * 100;
-        const prevProgressPercent = Math.max(0, ((state.step - 2) / questions.length) * 100);
+        pFill.style.width = `${progressPercent}%`;
 
-        appContainer.innerHTML = `
-            <div class="view">
-                <div class="progress-container">
-                    <div id="p-bar" class="progress-fill" style="width: ${prevProgressPercent}%"></div>
-                </div>
-
-                <div class="quiz-card">
-                    <h2 style="font-family: 'Archivo Black'">${q.text}</h2>
-                    ${q.options.map(o => `<button class="btn-opt" onclick="recordAnswer('${o.cat}')">${o.text}</button>`).join('')}
-                </div>
-            </div>`;
-
-        // IMPORTANT: This timeout triggers the animation AFTER the HTML is drawn
-        setTimeout(() => {
-            const bar = document.getElementById('p-bar');
-            if (bar) bar.style.width = `${progressPercent}%`;
-        }, 10);
-
+        contentArea.innerHTML = `
+            <div class="quiz-card">
+                <h2 style="font-family: 'Archivo Black'">${q.text}</h2>
+                ${q.options.map(o => `<button class="btn-opt" onclick="recordAnswer('${o.cat}')">${o.text}</button>`).join('')}
+            </div>
+        `;
     } else {
-        // Result Screen logic...
+        // Result Screen
+        progressBar.style.display = 'none';
         const winner = Object.keys(state.scores).reduce((a, b) => state.scores[a] > state.scores[b] ? a : b);
         const data = resultOptions[winner];
-        appContainer.innerHTML = `
-            <div class="view">
-                <div class="itinerary-card">
-                    <h2 style="font-family: 'Archivo Black'">${data.title}</h2>
-                    <img src="${data.img}" class="result-img">
-                    <div class="item"><strong>SERVICE:</strong> ${data.service}</div>
-                    <div class="item"><strong>RETAIL:</strong> ${data.shop}</div>
-                    <div class="item"><strong>TIP:</strong> ${data.tip}</div>
-                    <button class="btn-main" onclick="reset()">RESTART</button>
+        
+        contentArea.innerHTML = `
+            <div class="itinerary-card">
+                <h2 style="font-family: 'Archivo Black'">${data.title}</h2>
+                <img src="${data.img}" class="result-img">
+                <div class="item" onclick="findNearby('service')" style="cursor:pointer">
+                    <strong>SERVICE:</strong> ${data.service} 📍
                 </div>
-            </div>`;
+                <div class="item" onclick="findNearby('shop')" style="cursor:pointer">
+                    <strong>RETAIL:</strong> ${data.shop} 📍
+                </div>
+                <p id="search-status" style="font-size:0.75rem; font-weight:700; margin-top:15px;"></p>
+                <button class="btn-main" onclick="reset()">RESTART</button>
+            </div>
+        `;
     }
 }
 
