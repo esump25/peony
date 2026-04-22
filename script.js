@@ -8,7 +8,7 @@ appContainer.innerHTML = `
         <div id="dynamic-content"></div>
     </div>
 `;
-
+ 
 const contentArea = document.getElementById('dynamic-content');
 const progressBar = document.getElementById('main-progress');
 const pFill = document.getElementById('p-bar');
@@ -20,12 +20,12 @@ const resultOptions = {
     'cozy': { title: "SOFT GIRL SUNDAY", service: "HEAD MASSAGE", shop: "BOOKSTORE & MATCHA BAR", tip: "GIVE HUGS TODAY!", img: "images/cozy/cozy.jpg" },
     'edge': { title: "CHIC CITY EDGE", service: "GRAPHIC NAIL ART", shop: "STREETWEAR STORE", tip: "GO OUT THIS WEEKEND!", img: "images/edge/edge.jpg" }
 };
-
+ 
 let state = {
     step: 0, 
     scores: { glow: 0, retro: 0, zen: 0, power: 0, cozy: 0, edge: 0 }
 };
-
+ 
 const questions = [
     { text: "YOUR MORNING BEVERAGE?", options: [{ text: "ICED MATCHA", cat: "glow" }, { text: "ESPRESSO", cat: "power" }, { text: "HERBAL TEA", cat: "zen" }, { text: "OAT LATTE", cat: "cozy" }] },
     { text: "PICK A PALETTE:", options: [{ text: "PASTELS & CREAM", cat: "glow" }, { text: "CHROME & NEON", cat: "edge" }, { text: "EARTH TONES", cat: "zen" }, { text: "CHERRY & BLACK", cat: "retro" }] },
@@ -38,16 +38,16 @@ const questions = [
     { text: "FLORAL VIBE?", options: [{ text: "PEONIES", cat: "glow" }, { text: "LAVENDER", cat: "zen" }, { text: "ROSES", cat: "retro" }, { text: "BABY'S BREATH", cat: "cozy" }] },
     { text: "DREAM ESCAPE?", options: [{ text: "PARIS", cat: "power" }, { text: "TOKYO", cat: "edge" }, { text: "BALI", cat: "zen" }, { text: "LONDON", cat: "retro" }] }
 ];
-
+ 
 async function findNearby(type) {
     const status = document.getElementById('search-status');
     status.innerHTML = "FINDING LOCATIONS...";
-
+ 
     // Determine which result the user got
     const winner = Object.keys(state.scores).reduce((a, b) => state.scores[a] > state.scores[b] ? a : b);
     const data = resultOptions[winner];
     const searchQuery = type === 'service' ? data.service : data.shop;
-
+ 
     // 1. Ask for user's GPS coordinates
     navigator.geolocation.getCurrentPosition(async (position) => {
         const { latitude, longitude } = position.coords;
@@ -72,7 +72,7 @@ async function findNearby(type) {
         status.innerText = "LOCATION ACCESS DENIED. PLEASE ENABLE PERMISSIONS.";
     });
 }
-
+ 
 function render() {
     if (state.step === 0) {
         progressBar.style.display = 'none';
@@ -82,19 +82,28 @@ function render() {
             <button class="btn-main" onclick="nextStep()">START YOUR DAY</button>
         `;
     } else if (state.step <= questions.length) {
-        progressBar.style.display = 'block';
         const q = questions[state.step - 1];
         
         // Update progress bar width smoothly
         const progressPercent = ((state.step - 1) / questions.length) * 100;
-        pFill.style.width = `${progressPercent}%`;
-
+        const prevProgressPercent = Math.max(0, ((state.step - 2) / questions.length) * 100);
+ 
         contentArea.innerHTML = `
-            <div class="quiz-card">
-                <h2 style="font-family: 'Archivo Black'">${q.text}</h2>
-                ${q.options.map(o => `<button class="btn-opt" onclick="recordAnswer('${o.cat}')">${o.text}</button>`).join('')}
+            <div class="quiz-wrapper">
+                <div class="progress-container">
+                    <div id="p-bar" class="progress-fill" style="width: ${prevProgressPercent}%"></div>
+                </div>
+                <div class="quiz-card">
+                    <h2 style="font-family: 'Archivo Black'">${q.text}</h2>
+                    ${q.options.map(o => `<button class="btn-opt" onclick="recordAnswer('${o.cat}')">${o.text}</button>`).join('')}
+                </div>
             </div>
         `;
+ 
+        setTimeout(() => {
+            const bar = document.getElementById('p-bar');
+            if (bar) bar.style.width = `${progressPercent}%`;
+        }, 10);
     } else {
         // Result Screen
         progressBar.style.display = 'none';
@@ -117,13 +126,13 @@ function render() {
         `;
     }
 }
-
+ 
 window.nextStep = () => { state.step++; render(); };
 window.recordAnswer = (cat) => { state.scores[cat]++; state.step++; render(); };
 window.reset = () => { state.step = 0; state.scores = { glow: 0, retro: 0, zen: 0, power: 0, cozy: 0, edge: 0 }; render(); };
-
+ 
 render();
-
+ 
 // CHEAT KEYS: Press 1-6 on the Welcome Screen to jump to results
 window.addEventListener('keydown', (e) => {
     // Only allow cheats on the Welcome Screen (step 0)
@@ -136,7 +145,7 @@ window.addEventListener('keydown', (e) => {
             '5': 'cozy',
             '6': 'edge'
         };
-
+ 
         if (keys[e.key]) {
             console.log(`Cheat Activated: Jumping to ${keys[e.key]}`);
             
@@ -144,7 +153,7 @@ window.addEventListener('keydown', (e) => {
             // We reset all to 0, then give the "cheated" vibe 100 points
             Object.keys(state.scores).forEach(v => state.scores[v] = 0);
             state.scores[keys[e.key]] = 100;
-
+ 
             // 2. Jump straight to the results step
             state.step = questions.length + 1;
             

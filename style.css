@@ -3,14 +3,14 @@
     --peony: #F4C9D6;
     --white: #ffffff;
 }
-
+ 
 body {
     margin: 0;
     font-family: 'Inter', sans-serif;
     background-color: var(--peony);
     color: var(--espresso);
 }
-
+ 
 .view {
     min-height: 100vh;
     display: flex;
@@ -21,7 +21,7 @@ body {
     padding: 20px;
     box-sizing: border-box;
 }
-
+ 
 h1.logo-text {
     font-family: 'Archivo Black', sans-serif;
     font-size: clamp(3rem, 15vw, 6rem);
@@ -30,7 +30,7 @@ h1.logo-text {
     letter-spacing: -3px;
     line-height: 0.9;
 }
-
+ 
 .btn-main {
     background-color: var(--espresso);
     color: var(--peony);
@@ -42,12 +42,12 @@ h1.logo-text {
     margin-top: 2rem;
     transition: 0.2s;
 }
-
+ 
 .btn-main:hover {
     transform: translateY(-3px);
     box-shadow: 0px 10px 20px rgba(62, 39, 35, 0.2);
 }
-
+ 
 .quiz-card, .itinerary-card {
     background: var(--white);
     padding: 2.5rem;
@@ -57,11 +57,14 @@ h1.logo-text {
     border: 3px solid var(--espresso);
     box-shadow: 12px 12px 0px var(--espresso);
 }
-
+ 
 .btn-opt {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
-    padding: 15px;
+    height: 54px;
+    padding: 0 15px;
     margin: 15px 0;
     border: 2px solid var(--espresso);
     background: transparent;
@@ -70,12 +73,13 @@ h1.logo-text {
     color: var(--espresso);
     cursor: pointer;
     transition: 0.2s;
+    box-sizing: border-box;
 }
-
+ 
 .btn-opt:hover {
     background: var(--peony);
 }
-
+ 
 .result-img {
     width: 100%;
     height: 200px;
@@ -84,40 +88,46 @@ h1.logo-text {
     margin-bottom: 1.5rem;
     border: 2px solid var(--espresso);
 }
-
+ 
 .item {
     text-align: left;
     margin-bottom: 1rem;
     font-size: 0.9rem;
     line-height: 1.4;
 }
-
+ 
 .subtitle {
     letter-spacing: 5px; 
     font-weight: 700; 
     margin-top: -10px;
     font-size: 0.8rem;
 }
-
+ 
 .quiz-card h2 {
     margin: 1.5rem 0;
     line-height: 1.2;
 }
-
-/* Progress Bar - Now outside and blocky */
+ 
+.quiz-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 450px;
+}
+ 
+ 
 .progress-container {
     width: 100%;
-    max-width: 450px; /* Matches the quiz card width */
     height: 24px;
     background-color: var(--white);
     border: 3px solid var(--espresso);
-    margin: 0 auto 30px auto;
-    align-self: center;
-    /*box-shadow: 8px 8px 0px var(--espresso);  Matches card shadow style */
+    margin: 0 0 30px 0;
     position: relative;
     overflow: hidden;
+    box-sizing: border-box;
 }
-
+ 
 /* The actual bar that moves */
 .progress-fill {
     height: 100%;
