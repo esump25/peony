@@ -70,26 +70,30 @@ async function findNearby(type) {
             if (resultData.places && resultData.places.length > 0) {
                 const place = resultData.places[0];
                 
-                // SAVE THE DATA GLOBALLY
-                foundPlaces[type] = {
-                    name: place.displayName.text,
-                    address: place.formattedAddress
-                };
+                // --- FIX: Define these variables so they can be saved and used below ---
+                const placeName = place.displayName.text;
+                const placeAddress = place.formattedAddress;
+
+                // SAVE THE DATA TO OUR GLOBAL MEMORY
+                foundPlaces[type] = { name: placeName, address: placeAddress };
                 foundStatus[type] = true;
 
-                // Update the slot UI
+                // Update the slot UI with the dotted box (suggestion-box)
                 targetSlot.innerHTML = `
-                    <div class="suggestion-box" onclick="showReviewModal('${type}')" style="text-align:left; border: 2px dashed var(--espresso); padding: 15px; margin-top: 10px;">
+                    <div class="suggestion-box" onclick="showReviewModal('${type}')" style="text-align:left;">
                         <small><strong>${type.toUpperCase()}:</strong></small><br>
-                        <strong>${place.displayName.text.toUpperCase()}</strong><br>
-                        <span style="font-size:0.7rem;">${place.formattedAddress.toUpperCase()}</span>
+                        <strong>${placeName.toUpperCase()}</strong><br>
+                        <span style="font-size:0.7rem;">${placeAddress.toUpperCase()}</span>
                     </div>`;
                 
                 status.innerHTML = ""; 
 
                 if (foundStatus.service && foundStatus.shop) {
-                    document.getElementById('cal-btn').style.display = "block";
-                    document.getElementById('cal-btn').style.animation = "bounce 0.5s ease";
+                    const calBtn = document.getElementById('cal-btn');
+                    if (calBtn) {
+                        calBtn.style.display = "block";
+                        calBtn.style.animation = "bounce 0.5s ease";
+                    }
                 }
 
             } else {
@@ -102,13 +106,17 @@ async function findNearby(type) {
 }
 
 function showReviewModal(type) {
-    // Grab the name and address from the clicked slot
-    const slot = type === 'service' ? document.getElementById('service-slot') : document.getElementById('retail-slot');
-    const placeName = slot.dataset.name;
-    const placeAddress = slot.dataset.address;
+    // 1. Get the data we saved during the 'findNearby' search
+    const place = foundPlaces[type];
 
-    // Update the global state so the review form is pre-filled correctly
-    currentFoundPlace = { name: placeName, address: placeAddress };
+    // 2. Safety check: if the user clicks before the search finishes
+    if (!place || !place.name) {
+        console.error("Place data not found yet.");
+        return;
+    }
+
+    // 3. Set the global currentFoundPlace for the final review form
+    currentFoundPlace = { name: place.name, address: place.address };
 
     const modal = document.createElement('div');
     modal.id = "review-modal";
@@ -116,7 +124,7 @@ function showReviewModal(type) {
     modal.innerHTML = `
         <div class="quiz-card" style="max-width: 320px; border: 4px solid var(--espresso); position: relative;">
             <h2 style="font-family: 'Archivo Black'; font-size: 1.1rem;">DID YOU TRY IT?</h2>
-            <p style="font-size: 0.8rem; margin-bottom: 20px;">WANT TO LEAVE A REVIEW FOR<br><strong>${placeName.toUpperCase()}</strong>?</p>
+            <p style="font-size: 0.8rem; margin-bottom: 20px;">WANT TO LEAVE A REVIEW FOR<br><strong>${place.name.toUpperCase()}</strong>?</p>
             <div style="display: flex; gap: 10px;">
                 <button class="btn-opt" style="margin:0; flex:1" onclick="openReviewForm()">YES</button>
                 <button class="btn-opt" style="margin:0; flex:1" onclick="closeModal()">NO</button>
@@ -364,16 +372,22 @@ function showCalendarModal() {
     const winner = Object.keys(state.scores).reduce((a, b) => state.scores[a] > state.scores[b] ? a : b);
     const data = resultOptions[winner];
     
-    // We'll assume the "Day" is today, but we'll set it for a few hours from now
+    // assumptions for timing
     const startTime = new Date();
     startTime.setHours(startTime.getHours() + 2);
     const endTime = new Date();
     endTime.setHours(endTime.getHours() + 4);
 
+    // FIX: Pull from foundPlaces instead of currentFoundPlace
+    const sName = foundPlaces.service ? foundPlaces.service.name : "Service";
+    const sAddr = foundPlaces.service ? foundPlaces.service.address : "";
+    const rName = foundPlaces.shop ? foundPlaces.shop.name : "Retail";
+    const rAddr = foundPlaces.shop ? foundPlaces.shop.address : "";
+
     const eventDetails = {
         title: `PEONY: ${data.title} DAY`,
-        location: `${currentFoundPlace.serviceName} & ${currentFoundPlace.shopName}`,
-        description: `STOP 1: ${currentFoundPlace.serviceName}\nAddress: ${currentFoundPlace.serviceAddress}\n\nSTOP 2: ${currentFoundPlace.shopName}\nAddress: ${currentFoundPlace.shopAddress}\n\nTip: ${data.tip}`,
+        location: `${sName} & ${rName}`,
+        description: `STOP 1: ${sName}\nAddress: ${sAddr}\n\nSTOP 2: ${rName}\nAddress: ${rAddr}\n\nTip: ${data.tip}`,
         start: startTime,
         end: endTime
     };
