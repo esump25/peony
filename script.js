@@ -317,6 +317,81 @@ async function confirmDelete(id) {
     }
 }
 
+// --- CALENDAR LOGIC ---
+
+function showCalendarModal() {
+    const winner = Object.keys(state.scores).reduce((a, b) => state.scores[a] > state.scores[b] ? a : b);
+    const data = resultOptions[winner];
+    
+    // We'll assume the "Day" is today, but we'll set it for a few hours from now
+    const startTime = new Date();
+    startTime.setHours(startTime.getHours() + 2);
+    const endTime = new Date();
+    endTime.setHours(endTime.getHours() + 4);
+
+    const eventDetails = {
+        title: `🌸 PEONY: ${data.title} DAY`,
+        location: `${currentFoundPlace.name || data.service}, ${currentFoundPlace.address || ''}`,
+        description: `Stop 1: ${data.service}\nStop 2: ${data.shop}\n\nTip: ${data.tip}\n\nCurated by Peony.`,
+        start: startTime,
+        end: endTime
+    };
+
+    const modal = document.createElement('div');
+    modal.id = "calendar-modal";
+    modal.className = "modal-overlay";
+    modal.innerHTML = `
+        <div class="quiz-card" style="max-width: 320px; border: 4px solid var(--espresso); text-align: center;">
+            <h2 style="font-family: 'Archivo Black'; font-size: 1.1rem; margin-top:0;">SAVE THE VIBE</h2>
+            <p style="font-size: 0.8rem; margin-bottom: 20px;">WHERE DO YOU KEEP YOUR SCHEDULE?</p>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="btn-opt" style="margin:0;" onclick='addToGoogleCalendar(${JSON.stringify(eventDetails)})'>GOOGLE CALENDAR</button>
+                <button class="btn-opt" style="margin:0;" onclick='addToAppleCalendar(${JSON.stringify(eventDetails)})'>APPLE / OUTLOOK (.ICS)</button>
+                <button class="btn-opt" style="margin:0; border:none; text-decoration:underline; font-size:0.7rem;" onclick="closeCalendarModal()">MAYBE LATER</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeCalendarModal() {
+    const modal = document.getElementById('calendar-modal');
+    if (modal) modal.remove();
+}
+
+function addToGoogleCalendar(event) {
+    const formatTime = (date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
+    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${formatTime(event.start)}/${formatTime(event.end)}&details=${encodeURIComponent(event.description)}&location=${encodeURIComponent(event.location)}&sf=true&output=xml`;
+    window.open(url, '_blank');
+    closeCalendarModal();
+}
+
+function addToAppleCalendar(event) {
+    const formatTime = (date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "").split('.')[0] + "Z";
+    
+    const icsContent = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        `DTSTART:${formatTime(event.start)}`,
+        `DTEND:${formatTime(event.end)}`,
+        `SUMMARY:${event.title}`,
+        `DESCRIPTION:${event.description.replace(/\n/g, '\\n')}`,
+        `LOCATION:${event.location}`,
+        "END:VEVENT",
+        "END:VCALENDAR"
+    ].join("\n");
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = "peony-itinerary.ics";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    closeCalendarModal();
+}
+
 // --- CORE ENGINE ---
 
 function render() {
@@ -357,6 +432,9 @@ function render() {
                 <div class="item" onclick="findNearby('shop')" style="cursor:pointer">
                     <strong>RETAIL:</strong> ${data.shop} 📍
                 </div>
+                <button class="btn-main" style="width:100%; margin-top:10px; background:var(--white); color:var(--espresso); border:3px solid var(--espresso);" onclick="showCalendarModal()">
+                    ADD TO ITINERARY 📅
+                </button>
                 <div id="search-status" style="font-size:0.75rem; font-weight:700; margin-top:15px; min-height: 1em;"></div>
                 <button class="btn-main" onclick="reset()">RESTART</button>
             </div>
