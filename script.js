@@ -1,5 +1,7 @@
 const appContainer = document.getElementById('app');
 const RENDER_URL = "https://peonybackend.onrender.com";
+
+// Persistence for the UI elements
 appContainer.innerHTML = `
     <div class="view">
         <div id="main-progress" class="progress-container" style="display: none;">
@@ -8,24 +10,28 @@ appContainer.innerHTML = `
         <div id="dynamic-content"></div>
     </div>
 `;
- 
+
+// Global state for auto-filling reviews
+let currentFoundPlace = { name: "", address: "" }; 
+
 const contentArea = document.getElementById('dynamic-content');
 const progressBar = document.getElementById('main-progress');
 const pFill = document.getElementById('p-bar');
+
 const resultOptions = {
-    'glow': { title: "CLEAN GIRL", service: "HYDRATING FACIAL & LED", searchService: "Spa", shop: "SKINCARE BOUTIQUE", searchShop: "Skincare Store",tip: "WEAR YOUR FAVORITE GLOSS!", img: "images/glow/glow.jpg" },
+    'glow': { title: "CLEAN GIRL", service: "HYDRATING FACIAL & LED", searchService: "Spa", shop: "SKINCARE BOUTIQUE", searchShop: "Skincare Store", tip: "WEAR YOUR FAVORITE GLOSS!", img: "images/glow/glow.jpg" },
     'retro': { title: "TIMELESS VIBES", service: "CLASSIC BLOWOUT", searchService: "Hair Salon", shop: "THRIFTING OR VINTAGE STORE", searchShop: "Thrift Store", tip: "BRING A DIGITAL CAMERA!", img: "images/retro/retro.jpeg" },
     'zen': { title: "MINDFUL MORNING", service: "MEDITATION & SOUND BATH", searchService: "Sound Bath", shop: "CRYSTAL & CANDLE SHOP", searchShop: "Crystal Store", tip: "SPEND TIME IN NATURE! ", img: "images/zen/zen.png" },
     'power': { title: "MAIN CHARACTER ENERGY", service: "BROWS & LASH LIFT", searchService: "Lash Lift", shop: "DESIGNER STORES", searchShop: "Designer Store", tip: "GOLD HOOPS ARE A MUST!", img: "images/power/power.jpg" },
     'cozy': { title: "SOFT GIRL SUNDAY", service: "HEAD MASSAGE", searchService: "Massage", shop: "BOOKSTORE", searchShop: "Bookstore", tip: "GIVE HUGS TODAY!", img: "images/cozy/cozy.jpg" },
     'edge': { title: "CHIC CITY EDGE", service: "GRAPHIC NAIL ART", searchService: "Nail Salon", shop: "STREETWEAR STORE", searchShop: "Streetwear Store", tip: "GO OUT THIS WEEKEND!", img: "images/edge/edge.jpg" }
 };
- 
+
 let state = {
     step: 0, 
     scores: { glow: 0, retro: 0, zen: 0, power: 0, cozy: 0, edge: 0 }
 };
- 
+
 const questions = [
     { text: "YOUR MORNING BEVERAGE?", options: [{ text: "ICED MATCHA", cat: "glow" }, { text: "ESPRESSO", cat: "power" }, { text: "HERBAL TEA", cat: "zen" }, { text: "OAT LATTE", cat: "cozy" }] },
     { text: "PICK A PALETTE:", options: [{ text: "PASTELS & CREAM", cat: "glow" }, { text: "CHROME & NEON", cat: "edge" }, { text: "EARTH TONES", cat: "zen" }, { text: "CHERRY & BLACK", cat: "retro" }] },
@@ -38,26 +44,19 @@ const questions = [
     { text: "FLORAL VIBE?", options: [{ text: "PEONIES", cat: "glow" }, { text: "LAVENDER", cat: "zen" }, { text: "ROSES", cat: "retro" }, { text: "BABY'S BREATH", cat: "cozy" }] },
     { text: "DREAM ESCAPE?", options: [{ text: "PARIS", cat: "power" }, { text: "TOKYO", cat: "edge" }, { text: "BALI", cat: "zen" }, { text: "LONDON", cat: "retro" }] }
 ];
- 
+
+// --- LOGIC FUNCTIONS ---
+
 async function findNearby(type) {
     const status = document.getElementById('search-status');
     status.innerHTML = "FINDING LOCATIONS...";
 
     const winner = Object.keys(state.scores).reduce((a, b) => state.scores[a] > state.scores[b] ? a : b);
     const data = resultOptions[winner];
-    
-    // Logic: Use the 'search' query if it exists, otherwise fall back to the display text
-    let searchQuery;
-    if (type === 'service') {
-        searchQuery = data.searchService || data.service;
-    } else {
-        searchQuery = data.searchShop || data.shop;
-    }
+    let searchQuery = type === 'service' ? (data.searchService || data.service) : (data.searchShop || data.shop);
 
     navigator.geolocation.getCurrentPosition(async (position) => {
         const { latitude, longitude } = position.coords;
-        
-        // Use the RENDER_URL you set up earlier
         const url = `${RENDER_URL}/find-place?query=${encodeURIComponent(searchQuery)}&lat=${latitude}&lng=${longitude}`;
         
         try {
@@ -66,81 +65,118 @@ async function findNearby(type) {
             
             if (resultData.places && resultData.places.length > 0) {
                 const place = resultData.places[0];
-                status.innerHTML = `SUGGESTED: <strong>${place.displayName.text.toUpperCase()}</strong><br>${place.formattedAddress.toUpperCase()}`;
+                
+                // Store Google data for auto-fill
+                currentFoundPlace.name = place.displayName.text;
+                currentFoundPlace.address = place.formattedAddress;
+
+                status.innerHTML = `
+                    <div class="suggestion-box" onclick="showReviewModal()">
+                        SUGGESTED: <strong>${currentFoundPlace.name.toUpperCase()}</strong><br>
+                        ${currentFoundPlace.address.toUpperCase()}
+                        <div style="font-size: 0.6rem; margin-top: 5px; opacity: 0.7;">CLICK TO REVIEW</div>
+                    </div>`;
             } else {
-                status.innerText = "NO NEARBY SPOTS FOUND FOR THIS VIBE.";
+                status.innerText = "NO NEARBY SPOTS FOUND.";
             }
         } catch (err) {
-            status.innerText = "SERVER ERROR. PLEASE TRY AGAIN.";
+            status.innerText = "SERVER ERROR. RETRYING...";
         }
-    }, () => {
-        status.innerText = "LOCATION ACCESS DENIED.";
     });
 }
- 
-function promptReview(placeName) {
-    const wantsToReview = confirm(`Did you visit ${placeName}? Would you like to leave a review?`);
-    if (wantsToReview) {
-        showReviewForm(placeName);
-    } else {
-        // If they click no, trigger the normal API search
-        findNearby(placeName.includes('FACIAL') || placeName.includes('MASSAGE') ? 'service' : 'shop');
-    }
+
+function showReviewModal() {
+    const modal = document.createElement('div');
+    modal.id = "review-modal";
+    modal.className = "modal-overlay"; // Styled in CSS as a rectangle overlay
+    modal.innerHTML = `
+        <div class="quiz-card" style="max-width: 320px; border: 4px solid var(--espresso); position: relative;">
+            <h2 style="font-family: 'Archivo Black'; font-size: 1.1rem;">DID YOU TRY IT?</h2>
+            <p style="font-size: 0.8rem; margin-bottom: 20px;">WANT TO LEAVE A REVIEW FOR<br><strong>${currentFoundPlace.name}</strong>?</p>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-opt" style="margin:0; flex:1" onclick="openReviewForm()">YES</button>
+                <button class="btn-opt" style="margin:0; flex:1" onclick="closeModal()">NO</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
 }
 
-function showReviewForm(placeName) {
+function closeModal() {
+    const modal = document.getElementById('review-modal');
+    if (modal) modal.remove();
+}
+
+function openReviewForm() {
+    closeModal();
     progressBar.style.display = 'none';
+    
     contentArea.innerHTML = `
         <div class="quiz-card">
             <h2 style="font-family: 'Archivo Black'">LEAVE A REVIEW</h2>
-            <input type="text" id="rev-name" placeholder="YOUR NAME" class="btn-opt">
-            <input type="date" id="rev-date" class="btn-opt">
-            <textarea id="rev-text" placeholder="YOUR REVIEW..." class="btn-opt" style="height:100px; padding: 15px;"></textarea>
-            <select id="rev-rating" class="btn-opt">
-                <option value="5">5 STARS</option>
+            <p style="font-size: 0.7rem; margin-bottom: 15px; opacity: 0.8; text-align: left;">
+                <strong>PLACE:</strong> ${currentFoundPlace.name}<br>
+                <strong>ADDRESS:</strong> ${currentFoundPlace.address}
+            </p>
+            
+            <input type="text" id="rev-name" placeholder="YOUR NAME" class="btn-opt" style="text-align:left; padding-left:15px;">
+            <input type="date" id="rev-date" class="btn-opt" style="padding-left:15px;">
+            
+            <textarea id="rev-text" placeholder="HOW WAS THE VIBE?" class="btn-opt" style="height:100px; padding: 15px; text-align:left;"></textarea>
+            
+            <select id="rev-rating" class="btn-opt" style="padding-left:15px;">
+                <option value="5">5 STARS - PEAK VIBE</option>
                 <option value="4">4 STARS</option>
                 <option value="3">3 STARS</option>
                 <option value="2">2 STARS</option>
                 <option value="1">1 STAR</option>
             </select>
-            <button class="btn-main" onclick="submitReview('${placeName}')">SUBMIT</button>
-            <button class="btn-opt" style="border:none" onclick="render()">CANCEL</button>
-        </div>`;
+
+            <button class="btn-main" onclick="submitFinalReview()">SUBMIT REVIEW</button>
+        </div>
+    `;
 }
 
-async function submitReview(placeName) {
+async function submitFinalReview() {
     const winner = Object.keys(state.scores).reduce((a, b) => state.scores[a] > state.scores[b] ? a : b);
     const reviewData = {
         name: document.getElementById('rev-name').value,
         date: document.getElementById('rev-date').value,
         review: document.getElementById('rev-text').value,
         rating: document.getElementById('rev-rating').value,
-        place: placeName,
+        place: `${currentFoundPlace.name} (${currentFoundPlace.address})`, // Auto-filled
         vibe: winner
     };
 
-    await fetch(`${RENDER_URL}/reviews`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reviewData)
-    });
-
-    alert("Shared!");
-    reset();
+    try {
+        await fetch(`${RENDER_URL}/reviews`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(reviewData)
+        });
+        alert("Review shared!");
+        reset();
+    } catch (err) {
+        alert("Error saving review.");
+    }
 }
 
 async function viewReviews() {
     try {
         const res = await fetch(`${RENDER_URL}/reviews`);
         const reviews = await res.json();
+        progressBar.style.display = 'none';
         contentArea.innerHTML = `
             <h2 style="font-family: 'Archivo Black'">COMMUNITY FEED</h2>
             <div style="width:100%; max-height: 60vh; overflow-y: auto;">
                 ${reviews.map(r => `
-                    <div class="quiz-card" style="margin-bottom:20px; text-align:left; width: 100%;">
-                        <strong>${r.username.toUpperCase()}</strong> - ${"⭐".repeat(r.rating)}
-                        <p style="margin: 10px 0;">Tried: ${r.place_name}</p>
-                        <p style="font-style: italic;">"${r.review_text}"</p>
+                    <div class="quiz-card" style="margin-bottom:20px; text-align:left; width: 100%; padding: 20px;">
+                        <div style="display:flex; justify-content:space-between">
+                            <strong>${r.username.toUpperCase()}</strong>
+                            <span>${"⭐".repeat(r.rating)}</span>
+                        </div>
+                        <p style="margin: 10px 0; font-size: 0.8rem;">${r.place_name}</p>
+                        <p style="font-style: italic; font-size: 0.85rem;">"${r.review_text}"</p>
                     </div>
                 `).join('')}
             </div>
@@ -148,15 +184,17 @@ async function viewReviews() {
     } catch (e) { alert("Server waking up..."); }
 }
 
+// --- CORE ENGINE ---
+
 function render() {
     if (state.step === 0) {
         progressBar.style.display = 'none';
         contentArea.innerHTML = `
             <h1 class="logo-text">PEONY</h1>
             <p style="letter-spacing: 3px; font-weight: 700;">WELLNESS CURATOR</p>
-            <div style="display:flex; gap: 15px; justify-content: center;">
-                <button class="btn-main" onclick="nextStep()">START</button>
-                <button class="btn-main" style="background: var(--white); color: var(--espresso); border: 3px solid var(--espresso);" onclick="viewReviews()">FEED</button>
+            <div style="display:flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <button class="btn-main" onclick="nextStep()">START YOUR DAY</button>
+                <button class="btn-main" style="background: var(--white); color: var(--espresso); border: 3px solid var(--espresso);" onclick="viewReviews()">SEE FEED</button>
             </div>
         `;
     } else if (state.step <= questions.length) {
@@ -180,50 +218,33 @@ function render() {
             <div class="itinerary-card">
                 <h2 style="font-family: 'Archivo Black'">${data.title}</h2>
                 <img src="${data.img}" class="result-img">
-                <div class="item" onclick="promptReview('${data.service}')" style="cursor:pointer">
+                <div class="item" onclick="findNearby('service')" style="cursor:pointer">
                     <strong>SERVICE:</strong> ${data.service} 📍
                 </div>
-                <div class="item" onclick="promptReview('${data.shop}')" style="cursor:pointer">
+                <div class="item" onclick="findNearby('shop')" style="cursor:pointer">
                     <strong>RETAIL:</strong> ${data.shop} 📍
                 </div>
-                <p id="search-status" style="font-size:0.75rem; font-weight:700; margin-top:15px;"></p>
+                <div id="search-status" style="font-size:0.75rem; font-weight:700; margin-top:15px; min-height: 1em;"></div>
                 <button class="btn-main" onclick="reset()">RESTART</button>
             </div>
         `;
     }
 }
- 
+
 window.nextStep = () => { state.step++; render(); };
 window.recordAnswer = (cat) => { state.scores[cat]++; state.step++; render(); };
 window.reset = () => { state.step = 0; state.scores = { glow: 0, retro: 0, zen: 0, power: 0, cozy: 0, edge: 0 }; render(); };
- 
+
 render();
- 
-// CHEAT KEYS: Press 1-6 on the Welcome Screen to jump to results
+
+// CHEAT KEYS
 window.addEventListener('keydown', (e) => {
-    // Only allow cheats on the Welcome Screen (step 0)
     if (state.step === 0) {
-        const keys = {
-            '1': 'glow',
-            '2': 'retro',
-            '3': 'zen',
-            '4': 'power',
-            '5': 'cozy',
-            '6': 'edge'
-        };
- 
+        const keys = { '1': 'glow', '2': 'retro', '3': 'zen', '4': 'power', '5': 'cozy', '6': 'edge' };
         if (keys[e.key]) {
-            console.log(`Cheat Activated: Jumping to ${keys[e.key]}`);
-            
-            // 1. Set the scores so the logic picks the right winner
-            // We reset all to 0, then give the "cheated" vibe 100 points
             Object.keys(state.scores).forEach(v => state.scores[v] = 0);
             state.scores[keys[e.key]] = 100;
- 
-            // 2. Jump straight to the results step
             state.step = questions.length + 1;
-            
-            // 3. Refresh the screen
             render();
         }
     }
