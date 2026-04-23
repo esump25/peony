@@ -13,6 +13,7 @@ appContainer.innerHTML = `
 
 // Global state for auto-filling reviews
 let currentFoundPlace = { name: "", address: "" }; 
+let foundStatus = { service: false, shop: false };
 
 const contentArea = document.getElementById('dynamic-content');
 const progressBar = document.getElementById('main-progress');
@@ -49,6 +50,8 @@ const questions = [
 
 async function findNearby(type) {
     const status = document.getElementById('search-status');
+    const targetSlot = type === 'service' ? document.getElementById('service-slot') : document.getElementById('retail-slot');
+    
     status.innerHTML = "FINDING LOCATIONS...";
 
     const winner = Object.keys(state.scores).reduce((a, b) => state.scores[a] > state.scores[b] ? a : b);
@@ -66,33 +69,58 @@ async function findNearby(type) {
             if (resultData.places && resultData.places.length > 0) {
                 const place = resultData.places[0];
                 
-                // Store Google data for auto-fill
-                currentFoundPlace.name = place.displayName.text;
-                currentFoundPlace.address = place.formattedAddress;
+                // Store the specific data so the modal knows which one was clicked
+                if (type === 'service') {
+                    foundStatus.service = true;
+                    // We'll store these in a way the modal can access
+                    targetSlot.dataset.name = place.displayName.text;
+                    targetSlot.dataset.address = place.formattedAddress;
+                } else {
+                    foundStatus.shop = true;
+                    targetSlot.dataset.name = place.displayName.text;
+                    targetSlot.dataset.address = place.formattedAddress;
+                }
 
-                status.innerHTML = `
-                    <div class="suggestion-box" onclick="showReviewModal()">
-                        SUGGESTED: <strong>${currentFoundPlace.name.toUpperCase()}</strong><br>
-                        ${currentFoundPlace.address.toUpperCase()}
-                        <div style="font-size: 0.6rem; margin-top: 5px; opacity: 0.7;">CLICK TO REVIEW</div>
+                // Update the slot with the "suggestion-box" class for the dotted border
+                targetSlot.innerHTML = `
+                    <div class="suggestion-box" onclick="showReviewModal('${type}')" style="text-align:left;">
+                        <small><strong>${type === 'service' ? 'SERVICE' : 'RETAIL'}:</strong></small><br>
+                        <strong>${place.displayName.text.toUpperCase()}</strong><br>
+                        <span style="font-size:0.7rem;">${place.formattedAddress.toUpperCase()}</span>
                     </div>`;
+                
+                status.innerHTML = ""; 
+
+                if (foundStatus.service && foundStatus.shop) {
+                    document.getElementById('cal-btn').style.display = "block";
+                    document.getElementById('cal-btn').style.animation = "bounce 0.5s ease";
+                }
+
             } else {
                 status.innerText = "NO NEARBY SPOTS FOUND.";
             }
         } catch (err) {
-            status.innerText = "SERVER ERROR. RETRYING...";
+            status.innerText = "SERVER ERROR.";
         }
     });
 }
 
-function showReviewModal() {
+function showReviewModal(type) {
+    // Grab the name and address from the clicked slot
+    const slot = type === 'service' ? document.getElementById('service-slot') : document.getElementById('retail-slot');
+    const placeName = slot.dataset.name;
+    const placeAddress = slot.dataset.address;
+
+    // Update the global state so the review form is pre-filled correctly
+    currentFoundPlace = { name: placeName, address: placeAddress };
+
     const modal = document.createElement('div');
     modal.id = "review-modal";
-    modal.className = "modal-overlay"; // Styled in CSS as a rectangle overlay
+    modal.className = "modal-overlay";
     modal.innerHTML = `
         <div class="quiz-card" style="max-width: 320px; border: 4px solid var(--espresso); position: relative;">
             <h2 style="font-family: 'Archivo Black'; font-size: 1.1rem;">DID YOU TRY IT?</h2>
-            <p style="font-size: 0.8rem; margin-bottom: 20px;">WANT TO LEAVE A REVIEW FOR<br><strong>${currentFoundPlace.name}</strong>?</p>
+            <p style="font-size: 0.8rem; margin-bottom: 20px;">WANT TO LEAVE A REVIEW FOR<br><strong>${placeName.toUpperCase()}</strong>?</p>
             <div style="display: flex; gap: 10px;">
                 <button class="btn-opt" style="margin:0; flex:1" onclick="openReviewForm()">YES</button>
                 <button class="btn-opt" style="margin:0; flex:1" onclick="closeModal()">NO</button>
@@ -157,15 +185,15 @@ async function submitFinalReview() {
         
         const savedReview = await response.json();
 
-        // Check if we actually got an ID back from Postgres
         if (savedReview && savedReview.id) {
             let myReviews = JSON.parse(localStorage.getItem('myPeonyReviews') || "[]");
             myReviews.push(savedReview.id);
             localStorage.setItem('myPeonyReviews', JSON.stringify(myReviews));
         }
 
-        alert("Review shared!");
-        reset();
+        // --- CHANGE THIS LINE ---
+        showPostSubmitOptions(); 
+        
     } catch (err) { 
         console.error("Submit error:", err);
         alert("Error saving review."); 
@@ -287,6 +315,23 @@ function applyFilters() {
     }).join('');
 }
 
+function showPostSubmitOptions() {
+    contentArea.innerHTML = `
+        <div class="view">
+            <h2 style="font-family: 'Archivo Black'">REVIEW SHARED! 🌸</h2>
+            <p>WHAT WOULD YOU LIKE TO DO NEXT?</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 300px;">
+                <button class="btn-main" style="margin-top:0;" onclick="viewReviews()">VIEW THE FEED</button>
+                
+                <button class="btn-main" style="margin-top:0; background:var(--white); color:var(--espresso); border:3px solid var(--espresso);" onclick="render()">BACK TO MY RESULTS</button>
+                
+                <button class="btn-main" style="margin-top:0; opacity: 0.7;" onclick="reset()">START NEW QUIZ</button>
+            </div>
+        </div>
+    `;
+}
+
 async function confirmDelete(id) {
     if (confirm("ARE YOU SURE YOU WANT TO REMOVE THIS REVIEW?")) {
         try {
@@ -330,9 +375,9 @@ function showCalendarModal() {
     endTime.setHours(endTime.getHours() + 4);
 
     const eventDetails = {
-        title: `🌸 PEONY: ${data.title} DAY`,
-        location: `${currentFoundPlace.name || data.service}, ${currentFoundPlace.address || ''}`,
-        description: `Stop 1: ${data.service}\nStop 2: ${data.shop}\n\nTip: ${data.tip}\n\nCurated by Peony.`,
+        title: `PEONY: ${data.title} DAY`,
+        location: `${currentFoundPlace.serviceName} & ${currentFoundPlace.shopName}`,
+        description: `STOP 1: ${currentFoundPlace.serviceName}\nAddress: ${currentFoundPlace.serviceAddress}\n\nSTOP 2: ${currentFoundPlace.shopName}\nAddress: ${currentFoundPlace.shopAddress}\n\nTip: ${data.tip}`,
         start: startTime,
         end: endTime
     };
@@ -426,16 +471,25 @@ function render() {
             <div class="itinerary-card">
                 <h2 style="font-family: 'Archivo Black'">${data.title}</h2>
                 <img src="${data.img}" class="result-img">
-                <div class="item" onclick="findNearby('service')" style="cursor:pointer">
-                    <strong>SERVICE:</strong> ${data.service} 📍
+                
+                <div id="service-slot">
+                    <div class="item" onclick="findNearby('service')">
+                        <strong>SERVICE:</strong> ${data.service} 📍
+                    </div>
                 </div>
-                <div class="item" onclick="findNearby('shop')" style="cursor:pointer">
-                    <strong>RETAIL:</strong> ${data.shop} 📍
+
+                <div id="retail-slot">
+                    <div class="item" onclick="findNearby('shop')">
+                        <strong>RETAIL:</strong> ${data.shop} 📍
+                    </div>
                 </div>
-                <button class="btn-main" style="width:100%; margin-top:10px; background:var(--white); color:var(--espresso); border:3px solid var(--espresso);" onclick="showCalendarModal()">
-                    ADD TO ITINERARY 📅
+
+                <div id="search-status" style="font-size:0.7rem; font-weight:700; margin-top:10px; opacity:0.6;"></div>
+
+                <button id="cal-btn" class="btn-main" style="display:none; width:100%; margin-top:20px; background:var(--white); color:var(--espresso); border:3px solid var(--espresso);" onclick="showCalendarModal()">
+                    ADD THIS DAY TO CALENDAR 📅
                 </button>
-                <div id="search-status" style="font-size:0.75rem; font-weight:700; margin-top:15px; min-height: 1em;"></div>
+
                 <button class="btn-main" onclick="reset()">RESTART</button>
             </div>
         `;
