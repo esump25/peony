@@ -52,10 +52,11 @@ h1.logo-text {
     background: var(--white);
     padding: 2.5rem;
     border-radius: 12px;
-    width: 100%;
-    max-width: 450px;
+    width: 500px;
+    max-width: calc(100vw - 40px);
     border: 3px solid var(--espresso);
     box-shadow: 12px 12px 0px var(--espresso);
+    box-sizing: border-box;
 }
  
 .btn-opt {
@@ -118,7 +119,7 @@ h1.logo-text {
  
  
 .progress-container {
-    width: 100%;
+    width: 450px;
     height: 24px;
     background-color: var(--white);
     border: 3px solid var(--espresso);
