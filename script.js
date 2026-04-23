@@ -14,6 +14,7 @@ appContainer.innerHTML = `
 // Global state for auto-filling reviews
 let currentFoundPlace = { name: "", address: "" }; 
 let foundStatus = { service: false, shop: false };
+let foundPlaces = { service: null, shop: null };
 
 const contentArea = document.getElementById('dynamic-content');
 const progressBar = document.getElementById('main-progress');
@@ -405,21 +406,31 @@ function closeCalendarModal() {
 }
 
 function addToGoogleCalendar(event) {
+    // Convert strings back to Date objects
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+
     const formatTime = (date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${formatTime(event.start)}/${formatTime(event.end)}&details=${encodeURIComponent(event.description)}&location=${encodeURIComponent(event.location)}&sf=true&output=xml`;
+    
+    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${formatTime(start)}/${formatTime(end)}&details=${encodeURIComponent(event.description)}&location=${encodeURIComponent(event.location)}&sf=true&output=xml`;
+    
     window.open(url, '_blank');
     closeCalendarModal();
 }
 
 function addToAppleCalendar(event) {
+    // Convert strings back to Date objects
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+
     const formatTime = (date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "").split('.')[0] + "Z";
     
     const icsContent = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
         "BEGIN:VEVENT",
-        `DTSTART:${formatTime(event.start)}`,
-        `DTEND:${formatTime(event.end)}`,
+        `DTSTART:${formatTime(start)}`,
+        `DTEND:${formatTime(end)}`,
         `SUMMARY:${event.title}`,
         `DESCRIPTION:${event.description.replace(/\n/g, '\\n')}`,
         `LOCATION:${event.location}`,
@@ -466,27 +477,43 @@ function render() {
         progressBar.style.display = 'none';
         const winner = Object.keys(state.scores).reduce((a, b) => state.scores[a] > state.scores[b] ? a : b);
         const data = resultOptions[winner];
-        
+
         contentArea.innerHTML = `
             <div class="itinerary-card">
                 <h2 style="font-family: 'Archivo Black'">${data.title}</h2>
                 <img src="${data.img}" class="result-img">
                 
                 <div id="service-slot">
-                    <div class="item" onclick="findNearby('service')">
-                        <strong>SERVICE:</strong> ${data.service} 📍
-                    </div>
+                    ${foundStatus.service ? `
+                        <div class="suggestion-box" onclick="showReviewModal('service')" style="text-align:left; border: 2px dashed var(--espresso); padding: 15px; margin-top: 10px;">
+                            <small><strong>SERVICE:</strong></small><br>
+                            <strong>${foundPlaces.service.name.toUpperCase()}</strong><br>
+                            <span style="font-size:0.7rem;">${foundPlaces.service.address.toUpperCase()}</span>
+                        </div>
+                    ` : `
+                        <div class="item" onclick="findNearby('service')" style="cursor:pointer">
+                            <strong>SERVICE:</strong> ${data.service} 📍
+                        </div>
+                    `}
                 </div>
 
                 <div id="retail-slot">
-                    <div class="item" onclick="findNearby('shop')">
-                        <strong>RETAIL:</strong> ${data.shop} 📍
-                    </div>
+                    ${foundStatus.shop ? `
+                        <div class="suggestion-box" onclick="showReviewModal('shop')" style="text-align:left; border: 2px dashed var(--espresso); padding: 15px; margin-top: 10px;">
+                            <small><strong>RETAIL:</strong></small><br>
+                            <strong>${foundPlaces.shop.name.toUpperCase()}</strong><br>
+                            <span style="font-size:0.7rem;">${foundPlaces.shop.address.toUpperCase()}</span>
+                        </div>
+                    ` : `
+                        <div class="item" onclick="findNearby('shop')" style="cursor:pointer">
+                            <strong>RETAIL:</strong> ${data.shop} 📍
+                        </div>
+                    `}
                 </div>
 
-                <div id="search-status" style="font-size:0.7rem; font-weight:700; margin-top:10px; opacity:0.6;"></div>
+                <div id="search-status" style="font-size:0.75rem; font-weight:700; margin-top:15px; min-height: 1em;"></div>
 
-                <button id="cal-btn" class="btn-main" style="display:none; width:100%; margin-top:20px; background:var(--white); color:var(--espresso); border:3px solid var(--espresso);" onclick="showCalendarModal()">
+                <button id="cal-btn" class="btn-main" style="display:${(foundStatus.service && foundStatus.shop) ? 'block' : 'none'}; width:100%; margin-top:20px; background:var(--white); color:var(--espresso); border:3px solid var(--espresso);" onclick="showCalendarModal()">
                     ADD THIS DAY TO CALENDAR 📅
                 </button>
 
@@ -498,7 +525,18 @@ function render() {
 
 window.nextStep = () => { state.step++; render(); };
 window.recordAnswer = (cat) => { state.scores[cat]++; state.step++; render(); };
-window.reset = () => { state.step = 0; state.scores = { glow: 0, retro: 0, zen: 0, power: 0, cozy: 0, edge: 0 }; render(); };
+window.reset = () => { 
+    // 1. Reset the quiz progress and scores
+    state.step = 0; 
+    state.scores = { glow: 0, retro: 0, zen: 0, power: 0, cozy: 0, edge: 0 }; 
+    
+    // 2. Clear the found locations so the user can search again
+    foundStatus = { service: false, shop: false };
+    foundPlaces = { service: null, shop: null };
+    
+    // 3. Redraw the home screen
+    render(); 
+};
 
 render();
 
