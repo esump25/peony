@@ -559,15 +559,3 @@ window.addEventListener('keydown', (e) => {
         }
     }
 });
-
-window.nuclearOption = async () => {
-    if (confirm("DELETE EVERYTHING PERMANENTLY?")) {
-        const res = await fetch(`${RENDER_URL}/reviews`);
-        const all = await res.json();
-        for (const r of all) {
-            await fetch(`${RENDER_URL}/reviews/${r.id}`, { method: 'DELETE' });
-        }
-        alert("DATABASE WIPED");
-        location.reload();
-    }
-};
