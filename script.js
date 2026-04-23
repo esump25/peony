@@ -70,22 +70,17 @@ async function findNearby(type) {
             if (resultData.places && resultData.places.length > 0) {
                 const place = resultData.places[0];
                 
-                // Store the specific data so the modal knows which one was clicked
-                if (type === 'service') {
-                    foundStatus.service = true;
-                    // We'll store these in a way the modal can access
-                    targetSlot.dataset.name = place.displayName.text;
-                    targetSlot.dataset.address = place.formattedAddress;
-                } else {
-                    foundStatus.shop = true;
-                    targetSlot.dataset.name = place.displayName.text;
-                    targetSlot.dataset.address = place.formattedAddress;
-                }
+                // SAVE THE DATA GLOBALLY
+                foundPlaces[type] = {
+                    name: place.displayName.text,
+                    address: place.formattedAddress
+                };
+                foundStatus[type] = true;
 
-                // Update the slot with the "suggestion-box" class for the dotted border
+                // Update the slot UI
                 targetSlot.innerHTML = `
-                    <div class="suggestion-box" onclick="showReviewModal('${type}')" style="text-align:left;">
-                        <small><strong>${type === 'service' ? 'SERVICE' : 'RETAIL'}:</strong></small><br>
+                    <div class="suggestion-box" onclick="showReviewModal('${type}')" style="text-align:left; border: 2px dashed var(--espresso); padding: 15px; margin-top: 10px;">
+                        <small><strong>${type.toUpperCase()}:</strong></small><br>
                         <strong>${place.displayName.text.toUpperCase()}</strong><br>
                         <span style="font-size:0.7rem;">${place.formattedAddress.toUpperCase()}</span>
                     </div>`;
@@ -526,15 +521,13 @@ function render() {
 window.nextStep = () => { state.step++; render(); };
 window.recordAnswer = (cat) => { state.scores[cat]++; state.step++; render(); };
 window.reset = () => { 
-    // 1. Reset the quiz progress and scores
     state.step = 0; 
     state.scores = { glow: 0, retro: 0, zen: 0, power: 0, cozy: 0, edge: 0 }; 
     
-    // 2. Clear the found locations so the user can search again
+    // Clear the itinerary memory
     foundStatus = { service: false, shop: false };
     foundPlaces = { service: null, shop: null };
     
-    // 3. Redraw the home screen
     render(); 
 };
 
