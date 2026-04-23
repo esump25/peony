@@ -144,44 +144,177 @@ async function submitFinalReview() {
         date: document.getElementById('rev-date').value,
         review: document.getElementById('rev-text').value,
         rating: document.getElementById('rev-rating').value,
-        place: `${currentFoundPlace.name} (${currentFoundPlace.address})`, // Auto-filled
+        place: `${currentFoundPlace.name} (${currentFoundPlace.address})`,
         vibe: winner
     };
 
     try {
-        await fetch(`${RENDER_URL}/reviews`, {
+        const response = await fetch(`${RENDER_URL}/reviews`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(reviewData)
         });
+        
+        const savedReview = await response.json();
+
+        // Check if we actually got an ID back from Postgres
+        if (savedReview && savedReview.id) {
+            let myReviews = JSON.parse(localStorage.getItem('myPeonyReviews') || "[]");
+            myReviews.push(savedReview.id);
+            localStorage.setItem('myPeonyReviews', JSON.stringify(myReviews));
+        }
+
         alert("Review shared!");
         reset();
-    } catch (err) {
-        alert("Error saving review.");
+    } catch (err) { 
+        console.error("Submit error:", err);
+        alert("Error saving review."); 
     }
 }
+
+// --- NEW: Global variable to store reviews for filtering ---
+let allReviews = [];
 
 async function viewReviews() {
     try {
         const res = await fetch(`${RENDER_URL}/reviews`);
-        const reviews = await res.json();
+        allReviews = await res.json();
+        
         progressBar.style.display = 'none';
+        
         contentArea.innerHTML = `
             <h2 style="font-family: 'Archivo Black'">COMMUNITY FEED</h2>
-            <div style="width:100%; max-height: 60vh; overflow-y: auto;">
-                ${reviews.map(r => `
-                    <div class="quiz-card" style="margin-bottom:20px; text-align:left; width: 100%; padding: 20px;">
-                        <div style="display:flex; justify-content:space-between">
-                            <strong>${r.username.toUpperCase()}</strong>
-                            <span>${"⭐".repeat(r.rating)}</span>
-                        </div>
-                        <p style="margin: 10px 0; font-size: 0.8rem;">${r.place_name}</p>
-                        <p style="font-style: italic; font-size: 0.85rem;">"${r.review_text}"</p>
-                    </div>
-                `).join('')}
+            
+            <div class="filter-container">
+                <div class="search-wrapper">
+                    <input type="text" id="review-search" placeholder="SEARCH KEYWORDS..." class="btn-opt">
+                    <button class="search-inside-btn" onclick="applyFilters()">SEARCH</button>
+                </div>
+
+                <select id="sort-stars" onchange="applyFilters()" class="btn-opt" style="margin:0;">
+                    <option value="newest">NEWEST FIRST</option>
+                    <option value="high">RATING: HIGH TO LOW</option>
+                    <option value="low">RATING: LOW TO HIGH</option>
+                </select>
             </div>
-            <button class="btn-main" onclick="reset()">BACK</button>`;
-    } catch (e) { alert("Server waking up..."); }
+
+            <div id="reviews-list">
+                </div>
+            
+            <button class="btn-main" onclick="reset()">BACK TO HOME</button>
+        `;
+
+        // Add the Enter key listener again for better UX
+        document.getElementById('review-search').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') applyFilters();
+        });
+
+        applyFilters(); // Initial load
+
+    } catch (e) { 
+        alert("The feed is waking up..."); 
+    }
+}
+
+// This function handles the actual searching/sorting logic
+function applyFilters() {
+    const searchTerm = document.getElementById('review-search').value.toLowerCase();
+    const sortVal = document.getElementById('sort-stars').value;
+    const listContainer = document.getElementById('reviews-list');
+
+    // --- NEW: Get the list of IDs owned by this specific browser ---
+    const myOwnedIds = JSON.parse(localStorage.getItem('myPeonyReviews') || "[]");
+
+    // 1. Filter Logic
+    let filtered = allReviews.filter(r => {
+        return r.username.toLowerCase().includes(searchTerm) || 
+               r.review_text.toLowerCase().includes(searchTerm) || 
+               r.place_name.toLowerCase().includes(searchTerm);
+    });
+
+    // 2. Sort Logic
+    if (sortVal === "high") {
+        filtered.sort((a, b) => b.rating - a.rating);
+    } else if (sortVal === "low") {
+        filtered.sort((a, b) => a.rating - b.rating);
+    } else {
+        // Default: Newest first (by ID)
+        filtered.sort((a, b) => b.id - a.id);
+    }
+
+    // 3. Render the Cards
+    listContainer.innerHTML = filtered.length === 0 ? '<p style="margin-top:20px;">NO REVIEWS MATCH YOUR SEARCH.</p>' : 
+    filtered.map(r => {
+        const dateObj = new Date(r.visit_date);
+        const formattedDate = dateObj.toLocaleDateString('en-US', { 
+            month: 'short', day: 'numeric', year: 'numeric' 
+        });
+
+        // Check if THIS specific review was made by THIS user
+        const isMine = myOwnedIds.includes(r.id);
+
+        return `
+            <div class="quiz-card" style="margin-bottom:20px; text-align:left; width: 100%; padding: 20px; box-sizing: border-box; position: relative;">
+                <div style="display:flex; justify-content:space-between; align-items: flex-start;">
+                    <div>
+                        <strong style="font-size: 1.1rem;">${r.username.toUpperCase()}</strong><br>
+                        <small style="opacity: 0.6;">VISITED: ${formattedDate}</small>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="letter-spacing: 2px; display: block; margin-bottom: 5px;">${"⭐".repeat(r.rating)}</span>
+                        
+                        ${isMine ? `
+                            <button onclick="confirmDelete(${r.id})" 
+                                style="background:none; border:none; color:var(--espresso); cursor:pointer; font-size:0.6rem; text-decoration:underline; opacity:0.6; padding:0;">
+                                DELETE MY POST
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <p style="margin: 15px 0 5px 0; font-size: 0.85rem; font-weight: 700;">
+                    📍 ${r.place_name.toUpperCase()}
+                </p>
+                <p style="font-style: italic; font-size: 0.9rem; line-height: 1.4;">"${r.review_text}"</p>
+                
+                <div style="margin-top: 10px;">
+                    <span style="font-size: 0.6rem; background: var(--espresso); color: var(--peony); padding: 3px 8px; border-radius: 20px; font-weight:700;">
+                        ${r.vibe_category.toUpperCase()} VIBE
+                    </span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function confirmDelete(id) {
+    if (confirm("ARE YOU SURE YOU WANT TO REMOVE THIS REVIEW?")) {
+        try {
+            const response = await fetch(`${RENDER_URL}/reviews/${id}`, { 
+                method: 'DELETE' 
+            });
+
+            if (response.ok) {
+                // 1. Clean up Local Storage
+                let myReviews = JSON.parse(localStorage.getItem('myPeonyReviews') || "[]");
+                myReviews = myReviews.filter(reviewId => reviewId !== id);
+                localStorage.setItem('myPeonyReviews', JSON.stringify(myReviews));
+                
+                // 2. Update the local variable so applyFilters() doesn't show it
+                allReviews = allReviews.filter(r => r.id !== id);
+                
+                // 3. Re-render the feed
+                applyFilters();
+                
+                alert("REVIEW DELETED.");
+            } else {
+                alert("FAILED TO DELETE ON SERVER.");
+            }
+        } catch (err) {
+            console.error("Delete Error:", err);
+            alert("COULD NOT DELETE AT THIS TIME.");
+        }
+    }
 }
 
 // --- CORE ENGINE ---

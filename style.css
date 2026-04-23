@@ -167,3 +167,147 @@ h1.logo-text {
     justify-content: center;
     z-index: 999;
 }
+
+/* Makes sure inputs and selects don't have that ugly default blue border */
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--espresso);
+    background: var(--white);
+}
+
+/* Custom scrollbar for the feed to keep it looking aesthetic */
+#reviews-list::-webkit-scrollbar {
+    width: 6px;
+}
+#reviews-list::-webkit-scrollbar-thumb {
+    background: var(--espresso);
+    border-radius: 10px;
+}
+
+/* Center the entire filter group */
+.filter-container {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto 30px auto; /* Centers the container itself */
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centers the items inside */
+    gap: 15px;
+}
+
+/* Make sure children take up the full container width */
+.filter-container input, 
+.filter-container select {
+    width: 100%;
+    text-align: center;
+    text-align-last: center; /* Magic for select text */
+    box-sizing: border-box;
+}
+
+/* Keep the list of reviews centered too */
+#reviews-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* The Search Bar */
+#review-search {
+    width: 100%;
+    text-align: center;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+    background-color: rgba(255, 255, 255, 0.5); /* Semi-transparent initially */
+}
+
+/* Turns white when you click into it */
+#review-search:focus {
+    background-color: var(--white);
+    border-color: var(--espresso);
+    outline: none;
+}
+
+/* Centering the text inside the dropdown */
+#sort-stars {
+    width: 100%;
+    text-align-last: center;
+}
+
+/* Container to hold the input and button together */
+.search-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+#review-search {
+    width: 100%;
+    padding-right: 100px; /* Make room so text doesn't go under the button */
+    text-align: left; /* Better for typing with a button on the right */
+    padding-left: 20px;
+    background-color: rgba(255, 255, 255, 0.5);
+    margin: 0; /* Remove default margins to prevent misalignment */
+}
+
+#review-search:focus {
+    background-color: var(--white);
+}
+
+/* The small rectangle button inside the bar */
+.search-inside-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: var(--espresso);
+    color: var(--peony);
+    border: none;
+    padding: 8px 15px;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 0.7rem;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: 0.2s;
+}
+
+.search-inside-btn:hover {
+    background-color: #5d3d37; /* Slightly lighter espresso */
+}
+
+/* Ensure the filter container centers the wrapper */
+.filter-container {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto 30px auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Indicator that Service/Retail items are clickable */
+.item {
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    padding: 5px 10px;
+    border-radius: 4px;
+    display: inline-block; /* Helps the underline look cleaner */
+}
+
+.item:hover {
+    color: var(--white); /* Change text to white */
+    background-color: var(--espresso); /* Dark background to make it pop */
+    text-decoration: underline;
+    transform: translateX(5px); /* Subtle nudge to the right */
+}
+
+/* Optional: Make the "📍" icon bounce slightly on hover */
+.item:hover::after {
+    display: inline-block;
+    content: " 📍";
+    animation: bounce 0.5s infinite alternate;
+}
+
+@keyframes bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-3px); }
+}
